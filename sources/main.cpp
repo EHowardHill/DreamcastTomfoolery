@@ -12,7 +12,10 @@ public:
     GameScene(Window *window) : Scene<GameScene>(window) {}
     CameraPtr camera_;
     StagePtr stage_;
+
     ActorPtr actor_;
+    ActorPtr actor_floor;
+
     TexturePtr texture_;
     MaterialPtr material_;
     SoundPtr sound_;
@@ -45,22 +48,38 @@ public:
         actor_ = stage_->new_actor_with_mesh(cube);
         actor_->move_to(0.0, 0.0, -5.0);
 
+        auto floor = stage_->assets->new_mesh(VertexSpecification::DEFAULT);
+        floor->new_submesh_as_cube("rect", material_, 4.0);
+        actor_floor = stage_->new_actor_with_mesh(floor);
+        actor_floor->move_to(0.0, -3.0, -5.0);
+
         window->set_audio_listener(camera_);
         camera_->play_sound(sound_, AUDIO_REPEAT_FOREVER, DISTANCE_MODEL_AMBIENT);
-
-        camera_->look_at(actor_->absolute_position());
         stage_->new_light_as_directional(Vec3(1, 0, 0), Colour::WHITE);
     }
 
     void update(float dt)
     {
         _S_UNUSED(dt);
+
+        auto offset = camera_->position() - actor_->position();
+        offset = offset.normalized() * 7.0f;
+        auto newLocation = actor_->position() + offset;
+        newLocation.y = actor_->position().y;
+
+        camera_->move_to(newLocation);
+        camera_->look_at(actor_->absolute_position());
     }
 
     void fixed_update(float dt)
     {
-        actor_->rotate_x_by(Degrees(input->axis_value("Vertical") * 32.0f * dt));
-        actor_->rotate_y_by(Degrees(input->axis_value("Horizontal") * 32.0f * dt));
+        actor_->move_by(
+            input->axis_value("Horizontal") * 1.5f * dt,
+            0.0f,
+            input->axis_value("Vertical") * -1.5f * dt);
+
+        // actor_->rotate_x_by(Degrees(input->axis_value("Vertical") * 32.0f * dt));
+        // actor_->rotate_y_by(Degrees(input->axis_value("Horizontal") * 32.0f * dt));
     }
 };
 
