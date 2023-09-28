@@ -1,0 +1,9 @@
+{
+    "name": "monsters",
+    "package": "tld.domain.Monsters",
+    "executable": "monsters",
+    "description": "...",
+    "author": "...",
+    "license": "...",
+    "company": "monsters"
+}
