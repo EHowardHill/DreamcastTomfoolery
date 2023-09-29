@@ -3,8 +3,11 @@
 #include "simulant/extra.h"
 #include "simulant/macros.h"
 #include "simulant/utils/dreamcast.h"
+#include <math.h>
 
 using namespace smlt;
+
+#define M_PI 3.14159265358979323846
 
 class GameScene : public Scene<GameScene>
 {
@@ -13,12 +16,25 @@ public:
     CameraPtr camera_;
     StagePtr stage_;
 
-    ActorPtr actor_;
+    ActorPtr player;
     ActorPtr actor_floor;
 
-    TexturePtr texture_;
-    MaterialPtr material_;
+    TexturePtr txt_crate;
+    MaterialPtr mat_crate;
+
+    TexturePtr txt_grass;
+    MaterialPtr mat_grass;
+
     SoundPtr sound_;
+
+    int prev_degrees = 0;
+    int ticker = 0;
+    bool activate_z = false;
+
+    float lerp(float a, int b, float t)
+    {
+        return a * (1 - t) + b * t;
+    }
 
     void load()
     {
@@ -35,26 +51,40 @@ public:
 
         stage_->set_ambient_light(Colour(0.25f, 0.25f, 0.25f, 1.0f));
 
-        sound_ = stage_->assets->new_sound_from_file("sample_data/stillalive.ogg");
+        txt_crate = stage_->assets->new_texture_from_file("sample_data/crate.png");
+        txt_crate->set_texture_filter(TEXTURE_FILTER_BILINEAR);
+        mat_crate = stage_->assets->new_material_from_texture(txt_crate);
+        mat_crate->pass(0)->set_lighting_enabled(true);
 
-        texture_ = stage_->assets->new_texture_from_file("sample_data/ac_face.png");
-        texture_->set_texture_filter(TEXTURE_FILTER_BILINEAR);
-
-        material_ = stage_->assets->new_material_from_texture(texture_);
-        material_->pass(0)->set_lighting_enabled(true);
+        txt_grass = stage_->assets->new_texture_from_file("sample_data/grass3.png");
+        txt_grass->set_texture_filter(TEXTURE_FILTER_BILINEAR);
+        mat_grass = stage_->assets->new_material_from_texture(txt_grass);
+        mat_grass->pass(0)->set_lighting_enabled(true);
 
         auto cube = stage_->assets->new_mesh(VertexSpecification::DEFAULT);
-        cube->new_submesh_as_cube("rect", material_, 2.0);
-        actor_ = stage_->new_actor_with_mesh(cube);
-        actor_->move_to(0.0, 0.0, -5.0);
+        cube->new_submesh_as_cube("rect", mat_crate, 2.0);
+        player = stage_->new_actor_with_mesh(cube);
+        player->move_to(0.0, 0.0, -5.0);
 
         auto floor = stage_->assets->new_mesh(VertexSpecification::DEFAULT);
-        floor->new_submesh_as_cube("rect", material_, 4.0);
+        floor->new_submesh_as_cube("rect", mat_grass, 4.0);
         actor_floor = stage_->new_actor_with_mesh(floor);
         actor_floor->move_to(0.0, -3.0, -5.0);
 
-        window->set_audio_listener(camera_);
-        camera_->play_sound(sound_, AUDIO_REPEAT_FOREVER, DISTANCE_MODEL_AMBIENT);
+        // Set up custom axises
+        auto l_trigger = input->new_axis("Left Trigger");
+        l_trigger->set_joystick_axis(JOYSTICK_AXIS_LTRIGGER);
+
+        auto r_trigger = input->new_axis("Right Trigger");
+        r_trigger->set_joystick_axis(JOYSTICK_AXIS_RTRIGGER);
+
+        auto a_button = input->new_axis("JOYSTICK_BUTTON_A");
+        a_button->set_positive_joystick_button(JOYSTICK_BUTTON_A);
+
+        // window->set_audio_listener(camera_);
+        // sound_ = stage_->assets->new_sound_from_file("sample_data/stillalive.ogg");
+        // camera_->play_sound(sound_, AUDIO_REPEAT_FOREVER, DISTANCE_MODEL_AMBIENT);
+
         stage_->new_light_as_directional(Vec3(1, 0, 0), Colour::WHITE);
     }
 
@@ -62,24 +92,69 @@ public:
     {
         _S_UNUSED(dt);
 
-        auto offset = camera_->position() - actor_->position();
-        offset = offset.normalized() * 7.0f;
-        auto newLocation = actor_->position() + offset;
-        newLocation.y = actor_->position().y;
+        //S_INFO("Axis: {0}", input->axis_value_hard("Left Trigger"));
 
-        camera_->move_to(newLocation);
-        camera_->look_at(actor_->absolute_position());
+        // Camera Controls
+        ticker++;
+
+        if (input->axis_value_hard("Left Trigger") != 0) // 
+        {
+            if (!activate_z) {
+                activate_z = true;
+                auto newPos = player->position() - (player->forward() * 7.0f) + Vec3(0, 1.5f, 0);
+                camera_->move_to(newPos);
+            }
+        }
+        else
+        {
+            activate_z = false;
+            auto offset = camera_->position() - player->position();
+            offset = offset.normalized() * 7.0f;
+            auto newPos = player->position() + offset;
+            newPos.y = player->position().y + 1.5f;
+            camera_->move_to(newPos);
+        }
+
+        camera_->look_at(player->absolute_position());
     }
 
     void fixed_update(float dt)
     {
-        actor_->move_by(
-            input->axis_value("Horizontal") * 1.5f * dt,
-            0.0f,
-            input->axis_value("Vertical") * -1.5f * dt);
+        // Player Controls
+        auto horz = input->axis_value("Horizontal") * 1.5f * dt;
+        auto vert = input->axis_value("Vertical") * -1.5f * dt;
 
-        // actor_->rotate_x_by(Degrees(input->axis_value("Vertical") * 32.0f * dt));
-        // actor_->rotate_y_by(Degrees(input->axis_value("Horizontal") * 32.0f * dt));
+        if (input->axis_value_hard("Left Trigger") != 0) {
+            auto forw = camera_->forward() * vert * -75.0f * dt;
+            auto stos = camera_->right() * horz * -75.0f * dt;
+            auto newd = forw - stos;
+
+            player->move_by(
+                newd.x * 200.0f * dt,
+                0.0f,
+                newd.z * 200.0f * dt);
+        } else {
+            auto forw = player->position() - camera_->position();
+            forw = forw.normalized() * vert * -75.0f * dt;
+            auto stos = camera_->right() * horz * -75.0f * dt;
+            auto newd = forw - stos;
+
+            player->move_by(
+                newd.x * 200.0f * dt,
+                0.0f,
+                newd.z * 200.0f * dt);
+        }
+
+        auto cameraAngle = atan2(camera_->forward().x, camera_->forward().z) * (180.0 / M_PI);
+        auto analogAngle = atan2(vert, -horz) * (180.0 / M_PI);
+
+        auto idealQuat = Quaternion(Euler(0.0f, cameraAngle + analogAngle, 0.0f));
+        if (vert != 0.0f || horz != 0.0f)
+        {
+            player->rotate_to(idealQuat);
+        }
+
+        // if(input->axis_value_hard("Start") == 1) {
     }
 };
 
@@ -110,11 +185,11 @@ int main(int argc, char *argv[])
     config.width = 640;
     config.height = 480;
 #else
-    config.width = 1280;
-    config.height = 960;
+    config.width = 640;
+    config.height = 480;
 #endif
 
-    config.desktop.enable_virtual_screen = true;
+    config.desktop.enable_virtual_screen = false;
 
     ApplicationInst app(config);
     return app.run();
