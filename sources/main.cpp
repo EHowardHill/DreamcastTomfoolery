@@ -9,10 +9,10 @@ using namespace smlt;
 
 #define M_PI 3.14159265358979323846
 
-class GameScene : public Scene<GameScene>
+class GameScene : public smlt::PhysicsScene<GameScene>
 {
 public:
-    GameScene(Window *window) : Scene<GameScene>(window) {}
+    GameScene(Window *window) : smlt::PhysicsScene<GameScene>(window) {}
     CameraPtr camera_;
     StagePtr stage_;
 
@@ -135,11 +135,8 @@ public:
         }
 
         // Collisions
-        auto down_ray = Ray(player->absolute_position(), Vec3(0, -12, 0));
-        stage_->debug->draw_ray(player->absolute_position(), Vec3(0, -12, 0));
-        if (down_ray.intersects_aabb(actor_floor->transformed_aabb()))
-        {
-            S_INFO("Intersects!");
+        if (!actor_floor->transformed_aabb().contains_point(player->absolute_position())) {
+            player->move_by(Vec3(0.0f, -0.05f, 0.0f));
         }
     }
 };
