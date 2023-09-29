@@ -3,7 +3,10 @@
 #include "simulant/extra.h"
 #include "simulant/macros.h"
 #include "simulant/utils/dreamcast.h"
+
 #include <math.h>
+#include <vector>
+#include <string.h>
 
 using namespace smlt;
 
@@ -51,7 +54,7 @@ public:
         player->move_to(0.0, 0.0, -5.0);
 
         auto floor = stage_->assets->new_mesh(VertexSpecification::DEFAULT);
-        floor->new_submesh_as_cube("rect", mat_grass, 12.0);
+        floor->new_submesh_as_cube("floor", mat_grass, 12.0);
         actor_floor = stage_->new_actor_with_mesh(floor);
         actor_floor->move_to(0.0, -6.0, -5.0);
 
@@ -137,6 +140,11 @@ public:
         // Collisions
         if (!actor_floor->transformed_aabb().contains_point(player->absolute_position())) {
             player->move_by(Vec3(0.0f, -0.05f, 0.0f));
+        }
+
+        auto ar = actor_floor->base_mesh()->each_submesh();
+        for (auto ptr = ar.begin(); ptr < ar.end(); ptr++) {
+
         }
     }
 };
