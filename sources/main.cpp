@@ -61,15 +61,15 @@ public:
         mat_grass = stage_->assets->new_material_from_texture(txt_grass);
         mat_grass->pass(0)->set_lighting_enabled(true);
 
-        auto cube = stage_->assets->new_mesh(VertexSpecification::DEFAULT);
-        cube->new_submesh_as_cube("rect", mat_crate, 2.0);
+        auto cube = stage_->assets->new_mesh_from_file("sample_data/tank.obj");
+        //cube->new_submesh_as_cube("tank", mat_crate, 2.0);
         player = stage_->new_actor_with_mesh(cube);
         player->move_to(0.0, 0.0, -5.0);
 
         auto floor = stage_->assets->new_mesh(VertexSpecification::DEFAULT);
-        floor->new_submesh_as_cube("rect", mat_grass, 4.0);
+        floor->new_submesh_as_cube("rect", mat_grass, 12.0);
         actor_floor = stage_->new_actor_with_mesh(floor);
-        actor_floor->move_to(0.0, -3.0, -5.0);
+        actor_floor->move_to(0.0, -6.0, -5.0);
 
         // Set up custom axises
         auto l_trigger = input->new_axis("Left Trigger");
@@ -78,7 +78,7 @@ public:
         auto r_trigger = input->new_axis("Right Trigger");
         r_trigger->set_joystick_axis(JOYSTICK_AXIS_RTRIGGER);
 
-        auto a_button = input->new_axis("JOYSTICK_BUTTON_A");
+        auto a_button = input->new_axis("A Button");
         a_button->set_positive_joystick_button(JOYSTICK_BUTTON_A);
 
         // window->set_audio_listener(camera_);
@@ -86,6 +86,7 @@ public:
         // camera_->play_sound(sound_, AUDIO_REPEAT_FOREVER, DISTANCE_MODEL_AMBIENT);
 
         stage_->new_light_as_directional(Vec3(1, 0, 0), Colour::WHITE);
+        // stage_->debug->draw_line(player->absolute_position(), Vec3(0, -1, 0), Colour::RED);
     }
 
     void update(float dt)
@@ -148,10 +149,16 @@ public:
         auto cameraAngle = atan2(camera_->forward().x, camera_->forward().z) * (180.0 / M_PI);
         auto analogAngle = atan2(vert, -horz) * (180.0 / M_PI);
 
-        auto idealQuat = Quaternion(Euler(0.0f, cameraAngle + analogAngle, 0.0f));
+        auto idealQuat = Quaternion(Euler(0.0f, cameraAngle + analogAngle + 90.0f, 0.0f));
         if (vert != 0.0f || horz != 0.0f)
         {
             player->rotate_to(idealQuat);
+        }
+
+        auto down_ray = Ray(player->position(), Vec3(0, -3, 0));
+
+        if (down_ray.intersects_aabb(actor_floor->aabb())) {
+            S_INFO("Intersects!");
         }
 
         // if(input->axis_value_hard("Start") == 1) {
