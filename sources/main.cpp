@@ -25,7 +25,12 @@ public:
     TexturePtr txt_grass;
     MaterialPtr mat_grass;
 
+    behaviours::RigidBody *controller;
+
     bool activate_z = false;
+    bool activate_a = false;
+
+    int ticker = 0;
 
     void load()
     {
@@ -51,12 +56,24 @@ public:
 
         auto cube = stage_->assets->new_mesh_from_file("sample_data/tank.obj");
         player = stage_->new_actor_with_mesh(cube);
-        player->move_to(0.0, 0.0, -5.0);
+        player->move_to(0.0, 3.0, -5.0);
+        controller = player->new_behaviour<behaviours::RigidBody>(physics);
+
+        auto physMat = behaviours::PhysicsMaterial();
+        physMat.bounciness = 0.05f;
+        physMat.friction = 0.25f;
+        physMat.density = 0.25f;
+
+        controller->add_box_collider(player->aabb().dimensions(), physMat);
+        controller->set_linear_damping(0);
 
         auto floor = stage_->assets->new_mesh(VertexSpecification::DEFAULT);
         floor->new_submesh_as_cube("floor", mat_grass, 12.0);
         actor_floor = stage_->new_actor_with_mesh(floor);
         actor_floor->move_to(0.0, -6.0, -5.0);
+
+        auto c = actor_floor->new_behaviour<behaviours::StaticBody>(physics);
+        c->add_box_collider(actor_floor->aabb().dimensions(), behaviours::PhysicsMaterial::STONE);
 
         // Set up custom axises
         auto l_trigger = input->new_axis("Left Trigger");
@@ -100,9 +117,22 @@ public:
 
     void fixed_update(float dt)
     {
+        //S_INFO("Ticker: {0}", ticker);
+
         // Player Controls
-        auto horz = input->axis_value("Horizontal") * 1.5f * dt;
-        auto vert = input->axis_value("Vertical") * -1.5f * dt;
+        auto horz = input->axis_value("Horizontal") * 1.5f;
+        auto vert = input->axis_value("Vertical") * -1.5f;
+
+        auto c_horz = horz;
+        auto c_vert = vert;
+        if (c_horz < 0) c_horz *= -1;
+        if (c_vert < 0) c_vert *= -1;
+        auto c_total = c_horz + c_vert;
+        if (c_total > 1.75f) {
+            auto factor = (1.75f) / c_total;
+            horz = horz * factor;
+            vert = vert * factor;
+        }
 
         if (input->axis_value_hard("Left Trigger") != 0)
         {
@@ -110,10 +140,11 @@ public:
             auto stos = camera_->right() * horz * -75.0f * dt;
             auto newd = forw - stos;
 
-            player->move_by(
-                newd.x * 200.0f * dt,
-                0.0f,
-                newd.z * 200.0f * dt);
+            controller->add_impulse(
+                Vec3(
+                    newd.x * 5.0f * dt,
+                    0.0f,
+                    newd.z * 5.0f * dt));
         }
         else
         {
@@ -122,10 +153,11 @@ public:
             auto stos = camera_->right() * horz * -75.0f * dt;
             auto newd = forw - stos;
 
-            player->move_by(
-                newd.x * 200.0f * dt,
-                0.0f,
-                newd.z * 200.0f * dt);
+            controller->add_impulse(
+                Vec3(
+                    newd.x * 3.5f * dt,
+                    0.0f,
+                    newd.z * 3.5f * dt));
         }
 
         auto cameraAngle = atan2(camera_->forward().x, camera_->forward().z) * (180.0 / M_PI);
@@ -134,18 +166,24 @@ public:
         auto idealQuat = Quaternion(Euler(0.0f, cameraAngle + analogAngle + 90.0f, 0.0f));
         if (vert != 0.0f || horz != 0.0f)
         {
-            player->rotate_to(idealQuat);
+            controller->rotate_to(idealQuat);
+        }
+
+        if (input->axis_value_hard("A Button") == 1) {
+            if (!activate_a) {
+                activate_a = true;
+                controller->add_impulse(Vec3(0, 5, 0));
+            }
+        } else {
+            activate_a = false;
         }
 
         // Collisions
+        /*
         if (!actor_floor->transformed_aabb().contains_point(player->absolute_position())) {
-            player->move_by(Vec3(0.0f, -0.05f, 0.0f));
+            controller->move_by(Vec3(0.0f, -0.05f, 0.0f));
         }
-
-        auto ar = actor_floor->base_mesh()->each_submesh();
-        for (auto ptr = ar.begin(); ptr < ar.end(); ptr++) {
-
-        }
+        */
     }
 };
 
