@@ -29,11 +29,8 @@ public:
 
     bool activate_z = false;
     bool activate_a = false;
-    bool activate_l = false;
-    bool activate_r = false;
 
     int ticker = 0;
-    int side = 0;
 
     void load()
     {
@@ -59,15 +56,21 @@ public:
 
         auto cube = stage_->assets->new_mesh_from_file("sample_data/tank.obj");
         player = stage_->new_actor_with_mesh(cube);
-        player->move_to(0.0, 3.0, 0.0);
-        player->rotate_by(Degrees(15), Degrees(15), Degrees(15));
-        // controller = player->new_behaviour<behaviours::RigidBody>(physics);
-        // controller->add_box_collider(player->aabb().dimensions(), behaviours::PhysicsMaterial::WOOD);
+        player->move_to(0.0, 3.0, -5.0);
+        controller = player->new_behaviour<behaviours::RigidBody>(physics);
+
+        auto physMat = behaviours::PhysicsMaterial();
+        physMat.bounciness = 0.05f;
+        physMat.friction = 0.25f;
+        physMat.density = 0.25f;
+
+        controller->add_box_collider(player->aabb().dimensions(), physMat);
+        controller->set_linear_damping(0);
 
         auto floor = stage_->assets->new_mesh(VertexSpecification::DEFAULT);
         floor->new_submesh_as_cube("floor", mat_grass, 12.0);
         actor_floor = stage_->new_actor_with_mesh(floor);
-        actor_floor->move_to(0.0, -6.0, 0.0);
+        actor_floor->move_to(0.0, -6.0, -5.0);
 
         auto c = actor_floor->new_behaviour<behaviours::StaticBody>(physics);
         c->add_box_collider(actor_floor->aabb().dimensions(), behaviours::PhysicsMaterial::STONE);
@@ -89,7 +92,6 @@ public:
     {
         _S_UNUSED(dt);
 
-        /*
         // Camera Controls
         if (input->axis_value_hard("Left Trigger") != 0) //
         {
@@ -109,84 +111,17 @@ public:
             newPos.y = player->position().y + 1.5f;
             camera_->move_to(newPos);
         }
-        */
 
-        /*
-        0   10, 10
-        1   -10, 10
-        2   -10, -10
-        3   10, -10
-        */
-
-        if (input->axis_value_hard("Left Trigger") != 0)
-        {
-            if (!activate_l)
-            {
-                activate_l = true;
-                side -= 1;
-                if (side < 0)
-                    side = 3;
-            }
-        }
-        else
-        {
-            activate_l = false;
-        }
-
-        if (input->axis_value_hard("Right Trigger") != 0)
-        {
-            if (!activate_r)
-            {
-                activate_r = true;
-                side += 1;
-                if (side > 3)
-                    side = 0;
-            }
-        }
-        else
-        {
-            activate_r = false;
-        }
-
-        int mx = -15;
-        int mz = -15;
-        if (side == 0 || side == 3)
-            mx = 15;
-        if (side == 2 || side == 3)
-            mz = 15;
-        camera_->move_to(Vec3(lerp(camera_->absolute_position().x, mx, 3.0f * dt),
-                              10,
-                              lerp(camera_->absolute_position().z, mz, 3.0f * dt)));
-
-        camera_->look_at(Vec3(0, 3, 0));
-
-        if (input->axis_value_hard("A Button") == 1)
-        {
-            if (!activate_a)
-            {
-                activate_a = true;
-                controller = player->new_behaviour<behaviours::RigidBody>(physics);
-                controller->add_box_collider(player->aabb().dimensions(), behaviours::PhysicsMaterial::WOOD);
-            }
-        }
-
-        if (activate_a) {
-            auto deets = controller->angular_velocity();
-            S_INFO("{0}, {1}, {2}", deets.x, deets.y, deets.z);
-        }
+        camera_->look_at(player->absolute_position());
     }
 
     void fixed_update(float dt)
     {
-        // S_INFO("Ticker: {0}", ticker);
+        //S_INFO("Ticker: {0}", ticker);
 
         // Player Controls
-        auto horz = input->axis_value("Horizontal") * 5.0f;
-        auto vert = input->axis_value("Vertical") * -5.0f;
-
-        player->move_by((camera_->up() * vert * dt * -1) + (camera_->right() * horz * dt));
-
-        /*
+        auto horz = input->axis_value("Horizontal") * 1.5f;
+        auto vert = input->axis_value("Vertical") * -1.5f;
 
         auto c_horz = horz;
         auto c_vert = vert;
@@ -234,8 +169,14 @@ public:
             controller->rotate_to(idealQuat);
         }
 
-
-        */
+        if (input->axis_value_hard("A Button") == 1) {
+            if (!activate_a) {
+                activate_a = true;
+                controller->add_impulse(Vec3(0, 5, 0));
+            }
+        } else {
+            activate_a = false;
+        }
 
         // Collisions
         /*
